@@ -1,0 +1,94 @@
+################# CSC258 Assembly Final Project ###################
+# This file contains our implementation of Columns.
+#
+# Student 1: Name, Student Number
+# Student 2: Name, Student Number (if applicable)
+#
+# We assert that the code submitted here is entirely our own 
+# creation, and will indicate otherwise when it is not.
+#
+######################## Bitmap Display Configuration ########################
+# - Unit width in pixels:       TODO
+# - Unit height in pixels:      TODO
+# - Display width in pixels:    TODO
+# - Display height in pixels:   TODO
+# - Base Address for Display:   0x10008000 ($gp)
+##############################################################################
+
+    .data
+##############################################################################
+# Immutable Data
+##############################################################################
+# The address of the bitmap display. Don't forget to connect it!
+ADDR_DSPL:
+    .word 0x10008000
+# The address of the keyboard. Don't forget to connect it!
+ADDR_KBRD:
+    .word 0xffff0000
+
+##############################################################################
+# Mutable Data
+##############################################################################
+
+##############################################################################
+# Code
+##############################################################################
+	.text
+	.globl main
+
+    # Run the game.
+main:
+    # Initialize the game
+    
+    lw $t0, ADDR_DSPL # Load Bitmap Display
+    li $t1, 0xFFFFFF # Load Color
+    # Draw Player 1 Box
+    jal draw_box
+    
+    # Start game
+    jal game_loop
+    
+    
+draw_box:
+    # Drawing the first line (9 Long)
+    addi $t0, $t0, 268
+    addi $t2, $t0, 36
+draw_box_line_loop: 
+    beq $t0, $t2, draw_box_col
+    sw $t1, 0( $t0 )
+    addi $t0, $t0, 4
+    j draw_box_line_loop
+
+
+draw_box_col:
+    lw $t0, ADDR_DSPL
+    addi $t0, $t0, 396
+    addi $t2, $t0, 2560 # Draws until 20 rows have been created
+draw_box_col_loop: 
+    beq $t0, $t2, draw_final_row
+    sw $t1, 0( $t0 )
+    sw $t1, 32( $t0 )
+    addi $t0, $t0, 128
+    j draw_box_col_loop
+draw_final_row: 
+    addi $t2, $t0, 36
+draw_final_row_loop: 
+    beq $t0, $t2, draw_box_end
+    sw $t1, 0( $t0 )
+    addi $t0, $t0, 4
+    j draw_final_row_loop
+    
+draw_box_end:
+    jr $ra
+    
+
+game_loop:
+    # 1a. Check if key has been pressed
+    # 1b. Check which key has been pressed
+    # 2a. Check for collisions
+	# 2b. Update locations (capsules)
+	# 3. Draw the screen
+	# 4. Sleep
+
+    # 5. Go back to Step 1
+    j game_loop
