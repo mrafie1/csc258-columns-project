@@ -1,0 +1,258 @@
+################# CSC258 Assembly Final Project ###################
+# This file contains our implementation of Columns.
+#
+# Student 1: Name, Student Number
+# Student 2: Name, Student Number (if applicable)
+#
+# We assert that the code submitted here is entirely our own 
+# creation, and will indicate otherwise when it is not.
+#
+######################## Bitmap Display Configuration ########################
+# - Unit width in pixels:       TODO
+# - Unit height in pixels:      TODO
+# - Display width in pixels:    TODO
+# - Display height in pixels:   TODO
+# - Base Address for Display:   0x10008000 ($gp)
+##############################################################################
+
+    .data
+##############################################################################
+# Immutable Data
+##############################################################################
+# The address of the bitmap display. Don't forget to connect it!
+ADDR_DSPL: .word 0x10008000
+# The address of the keyboard. Don't forget to connect it!
+ADDR_KBRD: .word 0xffff0000
+# Dimensions of the gameboard
+HEIGHT: .word 20:1
+WIDTH: .word 7:1
+# Array representing the gameboard
+GAMEBOARD: .word 0:147 # WIDTH * (HEIGHT + 1)
+# COLORS
+RED: .word 0x9B111E:1
+ORANGE: .word 0xFF8C42:1
+YELLOW: .word 0xFFC857:1
+GREEN: .word 0x009B77:1
+BLUE: .word 0x0F52BA:1
+PURPLE: .word 0x9966CC:1
+
+##############################################################################
+# Mutable Data
+##############################################################################
+
+##############################################################################
+# Code
+##############################################################################
+	.text
+	.globl main
+
+    # Run the game.
+main:
+    # Initialize the game
+    
+    lw $t0, ADDR_DSPL # Load Bitmap Display
+    li $t1, 0xFFFFFF # Load Color
+    
+    ### Testing Gravity ###
+    li $t2, 0xff0000            # blue
+    la $t9, GAMEBOARD           # t9 holds address of gameboard
+    sw $t2, 52($t9)             # make the top right of the gameboard blue
+    #######################
+    
+    # Draw Player 1 Box
+    jal draw_box
+    
+    # Start game
+    jal game_loop
+
+draw_game_column:
+    # Push Previous Call Address onto stack
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    
+    # ARGS: $a2 (Coordinate where column is drawn)
+    li $v0, 42 
+    li $a0, 0
+    li $a1, 6
+    syscall
+    add $t1, $zero, $a0
+    
+    li $v0, 42 
+    li $a0, 0
+    li $a1, 6
+    syscall
+    add $t2, $zero, $a0
+    
+    li $v0, 42 
+    li $a0, 0
+    li $a1, 6
+    syscall
+    add $t3, $zero, $a0
+    
+    add $a3, $zero, $t1
+    jal check_set_color
+    lw $t4, 0($v0)
+    sw $t4, 40($t9)
+    
+    add $a3, $zero, $t2
+    jal check_set_color
+    lw $t4, 0($v0)
+    sw $t4, 68($t9)
+    
+    add $a3, $zero, $t3
+    jal check_set_color
+    lw $t4, 0($v0)
+    sw $t4, 96($t9)
+    
+    lw $ra, 0($sp)
+    jr $ra
+    
+check_set_color:
+    # ARGS: $a3 NUM TO COLOR
+    # FOR CREATING COLORS OF THE CREATION OF COLUMNS
+    # Push Previous Call Address onto stack
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    
+    # Check if number equal to color
+    li $t4, 0
+    beq $a3, $t4, setRED
+    li $t4, 1
+    beq $a3, $t4, setORANGE
+    li $t4, 2
+    beq $a3, $t4, setYELLOW
+    li $t4, 3
+    beq $a3, $t4, setGREEN
+    li $t4, 4
+    beq $a3, $t4, setBLUE
+    li $t4, 5
+    beq $a3, $t4, setPURPLE
+setRED:
+    la $v0, RED 
+    j endSetColor
+setORANGE:
+    la $v0, ORANGE
+    j endSetColor
+setYELLOW:
+    la $v0, YELLOW
+    j endSetColor
+setGREEN:
+    la $v0, GREEN
+    j endSetColor
+setBLUE:
+    la $v0, BLUE
+    j endSetColor
+setPURPLE:
+    la $v0, PURPLE
+    j endSetColor
+endSetColor:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
+draw_box:
+    # Drawing the first line (9 Long)
+    addi $t0, $t0, 268
+    addi $t2, $t0, 36
+draw_box_line_loop: 
+    beq $t0, $t2, draw_box_col
+    sw $t1, 0( $t0 )
+    addi $t0, $t0, 4
+    j draw_box_line_loop
+
+
+draw_box_col:
+    lw $t0, ADDR_DSPL
+    addi $t0, $t0, 396
+    addi $t2, $t0, 2560 # Draws until 20 rows have been created
+draw_box_col_loop: 
+    beq $t0, $t2, draw_final_row
+    sw $t1, 0( $t0 )
+    sw $t1, 32( $t0 )
+    addi $t0, $t0, 128
+    j draw_box_col_loop
+draw_final_row: 
+    addi $t2, $t0, 36
+draw_final_row_loop: 
+    beq $t0, $t2, draw_box_end
+    sw $t1, 0( $t0 )
+    addi $t0, $t0, 4
+    j draw_final_row_loop
+    
+draw_box_end:
+    jr $ra
+
+apply_gravity:
+    la $t9, GAMEBOARD
+    addi $t0, $zero, 146        # t0 holds i = 146
+    addi $t1, $zero, 6          # t1 holds 18
+    
+    apply_gravity_loop:
+        ble $t0, $t1, apply_gravity_loop_end    # exit loop when i <= 6
+        sll $t2, $t0, 2                         # t2 = t0*4 = i*4 = offset
+        add $t3, $t9, $t2                       # t3 points to A[i]
+        lw $t6, 0($t3)                          # t6 holds color of A[i]
+        bne $t6, $zero, upd00                   # check if color of A[i] i black, if it isn't, move on
+        subi $t0, $t0, 7                        # t0 holds i-7
+        sll $t2, $t0, 2                         # t2 update its offset
+        add $t4, $t9, $t2                       # t4 points to A[i-7], the row before
+        lw $t5, 0($t4)                          # t5 = A[i-7]
+        sw $t5, 0($t3)                          # A[i] = t5 = A[i-7]
+        sw $zero, 0($t4)                        # set A[i-7] to black
+        addi $t0, $t0, 7                        # t0 holds i
+        upd00:
+        subi $t0, $t0, 1                        # move to next element in array (t0 = i-1)
+        j apply_gravity_loop
+        
+    apply_gravity_loop_end:
+    jr $ra
+
+draw_particles:
+    la $t9, GAMEBOARD
+    lw $t8 ADDR_DSPL
+    addi $t0, $zero, 7     # t0 holds i = 7
+    addi $t1, $zero, 147    # t1 holds 147
+    
+    addi $t8, $t8, 400      # t8 points to top left of gameboard
+    addi $t7, $zero, 7      # set t7 = 7  = WIDTH
+    addi $t6, $zero, 20     # set t6 = 20 = HEIGHT
+    
+    # TODO double for loop
+    draw_particles_loop:
+        bge $t0, $t1, draw_particles_loop_end   # exit loop when i >= 147
+        sll $t2, $t0, 2                         # t2 = t0*4 = i*4 = offset
+        add $t3, $t9, $t2                       # t3 points to A[i]
+        lw $t4, 0($t3)                          # t4 = A[i]
+        sw $t4, 0($t8)                          # color current particle A[i]
+        subi $t7, $t7, 1                        # decrement t7 (column counter) by 1
+        beq $t7, $zero, if00                    # if t7 is zero, we move to next row
+        addi $t8, $t8, 4                        # move to next particle
+        addi $t0, $t0, 1                        # move to next element in array
+        j draw_particles_loop
+        if00:
+        addi $t8, $t8, 104                      # moving to next row
+        addi $t0, $t0, 1                        # move to next element in array
+        addi $t7, $zero, 7                      # reset t7
+        subi $t6, $t6, 1                        # decrement t6 (row counter) by 1
+        beq $t6, $zero, draw_particles_loop_end # if row counter is zero, we are finished drawing everything
+        j draw_particles_loop
+        
+    draw_particles_loop_end:
+    jr $ra
+
+game_loop:
+    # Draw Column Function ~~~!!!~~~
+    lw $t0, ADDR_DSPL
+    addi $a2, $t0, 412
+    jal draw_game_column
+    
+    jal apply_gravity
+    jal draw_particles
+    # 1a. Check if key has been pressed
+    # 1b. Check which key has been pressed
+    # 2a. Check for collisions
+	# 2b. Update locations (capsules)
+	# 3. Draw the screen
+	# 4. Sleep
+    # 5. Go back to Step 1
+    j game_loop
