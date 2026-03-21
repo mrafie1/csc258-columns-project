@@ -332,6 +332,7 @@ exit_detection:
     
     
 respond_to_a:
+    beq $t4, 0, exit_detection
     subi $t5, $t5, 4 # (MOVE LEFT)
     subi $t4, $t4, 1 # (Move Left)
     sw $t4, 0($t7) # Update X 
@@ -340,6 +341,7 @@ respond_to_a:
     j draw_new_col_position
     
 respond_to_d:
+    beq $t4, 6, exit_detection
     addi $t5, $t5, 4 # MOVE RIGHT
     addi $t4, $t4, 1 # (Move Right)
     sw $t4, 0($t7) # Update X 
@@ -373,7 +375,6 @@ draw_new_col_position:
     sw $t9 0($t3) # Erase Color
     
     jr $ra
-   
     
     
     
