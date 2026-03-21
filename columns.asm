@@ -39,6 +39,7 @@ PURPLE: .word 0x9966CC:1
 ##############################################################################
 # Mutable Data
 ##############################################################################
+FALLING_DOWN: .word 1:1
 
 ##############################################################################
 # Code
@@ -49,6 +50,7 @@ PURPLE: .word 0x9966CC:1
     # Run the game.
 main:
     # Initialize the game
+    li $s7, 0 # the game's clock. DO NOT USE ANYWHERE ELSE
     
     lw $t0, ADDR_DSPL # Load Bitmap Display
     li $t1, 0xFFFFFF # Load Color
@@ -240,19 +242,54 @@ draw_particles:
     draw_particles_loop_end:
     jr $ra
 
+check_falling_down:
+    li $s6, 0                   # assume initially things don't fall down
+    la $t9, GAMEBOARD
+    addi $t0, $zero, 146        # t0 holds i = 146
+    addi $t1, $zero, 6          # t1 holds 18
+    
+    falling_loop:
+        ble $t0, $t1, falling_loop_end          # exit loop when i <= 6
+        sll $t2, $t0, 2                         # t2 = t0*4 = i*4 = offset
+        add $t3, $t9, $t2                       # t3 points to A[i]
+        lw $t6, 0($t3)                          # t6 holds color of A[i]
+        bne $t6, 0, upd01                       # check if color of A[i] is black, if it isn't, move on
+        subi $t0, $t0, 7                        # t0 holds i-7
+        sll $t2, $t0, 2                         # t2 update its offset
+        add $t4, $t9, $t2                       # t4 points to A[i-7], the row before
+        lw $t5, 0($t4)                          # t5 = A[i-7]
+        bne $t5, 0, falls_down
+        addi $t0, $t0, 7                        # t0 holds i
+        upd01:
+        subi $t0, $t0, 1                        # move to next element in array (t0 = i-1)
+        j falling_loop
+    
+    falls_down:
+    li $s6, 1           # things are falling down
+    falling_loop_end:
+    jr $ra
+    
+
 game_loop:
     # Draw Column Function ~~~!!!~~~
-    lw $t0, ADDR_DSPL
+    beq $s6, 1, step                    # only make a new column when nothing is falling down (s6 stores this info)
+    lw $t0, ADDR_DSPL                   # make a new column
     addi $a2, $t0, 412
     jal draw_game_column
     
-    jal apply_gravity
-    jal draw_particles
+    step:
+    
     # 1a. Check if key has been pressed
     # 1b. Check which key has been pressed
     # 2a. Check for collisions
 	# 2b. Update locations (capsules)
+	jal apply_gravity
 	# 3. Draw the screen
+	jal draw_particles
 	# 4. Sleep
+	li $v0, 32
+	li $a0, 40
+	syscall
     # 5. Go back to Step 1
+    jal check_falling_down
     j game_loop
