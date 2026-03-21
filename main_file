@@ -130,6 +130,7 @@ draw_game_column:
     sw $t4, 96($t9)
     
     lw $ra, 0($sp)
+    addi $sp, $sp, 4
     jr $ra
     
 check_set_color:
@@ -230,6 +231,14 @@ apply_gravity:
         j apply_gravity_loop
         
     apply_gravity_loop_end:
+    gravity_update_coordinates:
+    # Load Y Coord
+    la $t6, Y_COORD
+    lw $t4, 0( $t6 )
+    # Add 1 and Update
+    addi $t4, $t4, 1
+    sw $t4, 0($t6)
+    
     jr $ra
 
 draw_particles:
@@ -324,13 +333,11 @@ detect_movement:
     lw $t8 4($t9)
     beq $t8, 0x61, respond_to_a
     beq $t8, 0x64, respond_to_d
+    beq $t8, 0x77, respond_to_w
+    beq $t8, 0x73, respond_to_s
     
-exit_detection:
-    
-    jr $ra
-    
-    
-    
+exit_detection:  
+    jr $ra 
 respond_to_a:
     beq $t4, 0, exit_detection
     subi $t5, $t5, 4 # (MOVE LEFT)
@@ -347,6 +354,36 @@ respond_to_d:
     sw $t4, 0($t7) # Update X 
     
     j draw_new_col_position
+    
+respond_to_w:
+    lw $t6, 0($t3)
+    lw $t7, 28($t3)
+    lw $t8, 56($t3)
+    
+    sw $t7 0($t3)
+    sw $t8 28($t3)
+    sw $t6 56($t3)
+    
+    jr $ra 
+    
+respond_to_s: 
+    
+    
+    ### STORE CURRENT $ra INTO STACK
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    
+    ### CALL GRAVITY FUNCTION
+    jal apply_gravity
+    
+    ### POP CURRENT $ra OUT OF STACK
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    
+    
+    ### RETURN 
+    jr $ra
+    
     
 draw_new_col_position:
     ### DRAW CURRENT PIXELS INTO NEW LOCATION
@@ -375,6 +412,3 @@ draw_new_col_position:
     sw $t9 0($t3) # Erase Color
     
     jr $ra
-    
-    
-    
