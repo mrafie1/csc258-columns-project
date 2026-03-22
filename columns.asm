@@ -40,6 +40,10 @@ PURPLE: .word 0x9966CC:1
 # Mutable Data
 ##############################################################################
 FALLING_DOWN: .word 1:1
+GRAVITY_COUNTER: .word 0:1
+# Coords
+X_COORD: .word 0:1
+Y_COORD: .word 0:1
 
 ##############################################################################
 # Code
@@ -56,18 +60,36 @@ main:
     li $t1, 0xFFFFFF # Load Color
     
     ### Testing Gravity ###
-    li $t2, 0xff0000            # blue
-    la $t9, GAMEBOARD           # t9 holds address of gameboard
-    sw $t2, 52($t9)             # make the top right of the gameboard blue
+    #li $t2, 0xff0000            # blue
+    #la $t9, GAMEBOARD           # t9 holds address of gameboard
+    #sw $t2, 52($t9)             # make the top right of the gameboard blue
     #######################
     
     # Draw Player 1 Box
     jal draw_box
     
+    ## TESTING COLUMN ##
+    addi $a2, $t0, 412
+    jal draw_game_column
+    jal draw_particles
+    ####################
+    
     # Start game
     jal game_loop
 
 draw_game_column:
+    # INIT X AND Y VALUE OF TOP PIXEL
+    la $t9, X_COORD
+    la $t8, Y_COORD
+    
+    li $t7, 3 # SET X to 3
+    li $t6, 0 # SET Y TO 0
+    
+    sw $t7, 0($t9)
+    sw $t6, 0($t8)
+    
+    
+    la $t9, GAMEBOARD
     # Push Previous Call Address onto stack
     addi $sp, $sp, -4
     sw $ra, 0($sp)
@@ -93,6 +115,7 @@ draw_game_column:
     
     add $a3, $zero, $t1
     jal check_set_color
+    
     lw $t4, 0($v0)
     sw $t4, 40($t9)
     
@@ -107,6 +130,7 @@ draw_game_column:
     sw $t4, 96($t9)
     
     lw $ra, 0($sp)
+    addi $sp, $sp, 4
     jr $ra
     
 check_set_color:
@@ -207,6 +231,13 @@ apply_gravity:
         j apply_gravity_loop
         
     apply_gravity_loop_end:
+    gravity_update_coordinates:
+    # Load Y Coord
+    la $t6, Y_COORD
+    lw $t4, 0( $t6 )
+    # Add 1 and Update
+    addi $t4, $t4, 1
+    sw $t4, 0($t6)
     jr $ra
 
 draw_particles:
@@ -278,12 +309,20 @@ game_loop:
     jal draw_game_column
     
     step:
-    
+    jal detect_movement 
     # 1a. Check if key has been pressed
     # 1b. Check which key has been pressed
     # 2a. Check for collisions
 	# 2b. Update locations (capsules)
+	### ONLY UPDATE GRAVITY EVERY 5 FRAMES
+	la $t0, GRAVITY_COUNTER
+	lw $t1, 0($t0)
+	addi $t1, $t1, 1
+	sw $t1, 0($t0)
+	bne $t1, 5, skip_gravity
+	sw $zero, 0($t0)
 	jal apply_gravity
+	skip_gravity:
 	# 3. Draw the screen
 	jal draw_particles
 	# 4. Sleep
@@ -293,3 +332,132 @@ game_loop:
     # 5. Go back to Step 1
     jal check_falling_down
     j game_loop
+
+detect_movement: 
+    ### INIT KEYBOARD
+    la $t1, GAMEBOARD
+    lw $t9, ADDR_KBRD
+    
+    la $t7, X_COORD
+    la $t6, Y_COORD
+    #################################
+    lw $t5, 0( $t7 ) # Load value of X
+    lw $t4, 0( $t6 ) # Load value of Y
+   
+    # Format Coordinates
+    # Format Y
+    addi $t4, $t4, 1
+    li $t3, 7 # TEMP
+    mult $t4, $t3
+    mflo $t4
+    
+    # Format entire coordinate
+    add $t5, $t4, $t5 
+    sll $t5, $t5, 2 # Represents the actual value in memory of the coordinate
+    add $t5, $t5, $t1
+    add $t3, $t5, $zero #KEEP TRACK!
+    
+    # Keep track of x coord
+    lw $t4, 0( $t7 )
+    
+    ### CHECK INPUT 
+    lw $t8, 0($t9)
+    beq $t8, 0, exit_detection
+    lw $t8 4($t9)
+    beq $t8, 0x61, respond_to_a
+    beq $t8, 0x64, respond_to_d
+    beq $t8, 0x77, respond_to_w
+    beq $t8, 0x73, respond_to_s
+    
+exit_detection:  
+    jr $ra 
+respond_to_a:
+    beq $t4, 0, exit_detection
+    lw $t2 52($t5)                      # only need to check this pixel for left collision detection
+    bne $t2, 0, exit_detection          # check if there is something to the left
+    subi $t5, $t5, 4 # (MOVE LEFT)
+    subi $t4, $t4, 1 # (Move Left)
+    sw $t4, 0($t7) # Update X 
+    j draw_new_col_position
+    
+respond_to_d:
+    beq $t4, 6, exit_detection
+    lw $t2 60($t5)                      # only need to check this pixel for right collision detection
+    bne $t2, 0, exit_detection          # check if there is something to the right
+    addi $t5, $t5, 4 # MOVE RIGHT
+    addi $t4, $t4, 1 # (Move Right)
+    sw $t4, 0($t7) # Update X 
+    j draw_new_col_position
+    
+respond_to_w:
+    lw $t6, 0($t3)
+    lw $t7, 28($t3)
+    lw $t8, 56($t3)
+    
+    sw $t7 0($t3)
+    sw $t8 28($t3)
+    sw $t6 56($t3)
+    
+    jr $ra 
+    
+respond_to_s: 
+    ### STORE CURRENT $ra INTO STACK
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    
+    ### CALL GRAVITY FUNCTION
+    jal apply_gravity
+    
+    ### POP CURRENT $ra OUT OF STACK
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    
+    
+    ### RETURN 
+    jr $ra
+    
+draw_new_col_position:
+    ### DRAW CURRENT PIXELS INTO NEW LOCATION
+    ### ERASE PIXELS IN PREVIOUS LOCATION
+    ### t3 represents the current location, t5: the location we want to go into
+    # 6,7,8,9 FREE!
+    li $t9, 0x000000 # Store blank color
+    
+    lw $t6, 0($t3) # Find color here!
+    sw $t6, 0($t5) # Store color
+    sw $t9, 0($t3) # Erase Color
+    
+    # Rinse and Repeat
+    addi $t3, $t3, 28
+    addi $t5, $t5, 28
+    
+    lw $t6, 0($t3) # Find color here!
+    sw $t6, 0($t5) # Store color
+    sw $t9 0($t3) # Erase Color
+    
+    addi $t3, $t3, 28
+    addi $t5, $t5, 28
+    
+    lw $t6, 0($t3) # Find color here!
+    sw $t6, 0($t5) # Store color
+    sw $t9 0($t3) # Erase Color
+    
+    jr $ra
+    
+check_rows:
+    la $t9 GAMEBOARD
+    lw $t0, 0                   # row index
+    lw $t1, 0                   # column index
+    check_rows_loop:
+        beq $t0, 21, check_rows_end
+        beq $t1, 5, next_row
+            
+        j check_rows_loop
+        next_row:
+        lw $t1, 0
+        addi $t0, $t0, 1
+        j check_rows_loop
+    check_rows_end:
+    jr $ra
+check_cols:
+check_diags:
