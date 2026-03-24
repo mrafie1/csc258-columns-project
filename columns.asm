@@ -44,6 +44,9 @@ GRAVITY_COUNTER: .word 0:1
 # Coords
 X_COORD: .word 0:1
 Y_COORD: .word 0:1
+# Clearing Counter
+CLEAR_LOOP: .word 0:1
+GRAVITY_LOOP: .word 0:1
 
 ##############################################################################
 # Code
@@ -304,6 +307,7 @@ check_falling_down:
 game_loop:
     # Draw Column Function ~~~!!!~~~
     beq $s6, 1, step                    # only make a new column when nothing is falling down (s6 stores this info)
+    jal clear_stuff
     lw $t0, ADDR_DSPL                   # make a new column
     addi $a2, $t0, 412
     jal draw_game_column
@@ -332,6 +336,99 @@ game_loop:
     # 5. Go back to Step 1
     jal check_falling_down
     j game_loop
+
+clear_stuff:
+    clear_loop:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    li $a0, 4
+    jal clear_rows
+    li $a0, -24
+    jal clear_rows
+    li $a0, 28
+    jal clear_rows
+    li $a0, 32
+    jal clear_rows
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    gravity_loop:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    jal apply_gravity
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    la $t0, GRAVITY_LOOP
+    lw $t1, 0($t0)
+    addi $t1, $t1, 1
+    sw $t1, 0($t0)
+    bge $t1, 20, next_loop
+    j gravity_loop
+    next_loop:
+    sw $zero, 0($t0)
+    la $t0, CLEAR_LOOP
+    lw $t1, 0($t0)
+    addi $t1, $t1, 1
+    sw $t1, 0($t0)
+    bge $t1, 20, end_clear
+    j clear_loop
+end_clear:
+    la $t0, CLEAR_LOOP
+    sw $zero, 0($t0)
+    la $t0, GRAVITY_LOOP
+    sw $zero, 0($t0)
+    jr $ra
+
+clear_rows:
+    la $t9, GAMEBOARD
+    add $t0, $zero, $zero           # row counter
+    add $t1, $zero, $zero           # column counter
+    clear_pixel_loop:
+    mult $t2, $t0, 7
+    add $t2, $t2, $t1
+    bge $t2, 147, exit_row_recursion
+    sll $t2, $t2, 2     
+    add $t2, $t9, $t2   # t2 stores current array element's memory address
+    li $s0, 1           # counter
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    addi $t6, $t1, 0    # variable to keep track whether we have exited bounds or not
+    jal recursive_rows
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    addi $t1, $t1, 1
+    ble $t1, 6, clear_pixel_loop
+    li $t1, 0
+    addi $t0, $t0, 1
+    j clear_pixel_loop
+recursive_rows:
+    add $t3, $t2, $a0    # next array element
+    lw $t4, 0($t2)      # current color
+    lw $t5, 0($t3)      # next color
+    # TODO: FIX THIS WRAPPING PROBLEM
+    sub $t7, $t3, $t9
+    srl $t7, $t7, 2
+    bge $t7, 147, exit_row_recursion    # next element is out of array bounds
+    beq $t6, 6, exit_row_recursion      # next element is out of column bounds
+    bne $t4, $t5, exit_row_recursion    # next element does not have the same color
+    addi $sp, $sp, -4
+    sw $t2, 0($sp)      # store current array element in stack
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)      # store ra in stack
+    add $t2, $t2, $a0    # set current array element to next element
+    addi $s0, $s0, 1    # increment counter
+    addi $t6, $t6, 1
+    jal recursive_rows
+    lw $ra, 0($sp)      # pop ra from stack
+    addi $sp, $sp, 4
+    lw $t2, 0($sp)      # get stored current array element
+    addi $sp, $sp, 4
+exit_row_recursion:
+    bge $s0, 3, clear_color
+    jr $ra
+    clear_color:
+    sw $zero, 0($t2)
+    jr $ra
+    
 
 detect_movement: 
     ### INIT KEYBOARD
