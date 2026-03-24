@@ -68,7 +68,39 @@ main:
     #sw $t2, 52($t9)             # make the top right of the gameboard blue
     #######################
     
-    # Draw Player 1 Box
+    ### CHOOSE DIFFICULTY
+    li $s3, 0 # DIFFICULTY SETTING
+    # 1 - EASY
+    # 2 - NORMAL
+    # 3 - HARD
+    
+difficulty_select_main:
+    # DRAW OPTIONS TO SELECT HERE TODO 
+    lw $t9, ADDR_KBRD
+    lw $t8, 0($t9)
+    beq $t8, 0, difficulty_select_main
+    lw $t8 4($t9)
+    beq $t8, 0x31, set_easy # PRESSED 1
+    
+    beq $t8, 0x32, set_normal # PRESSED 2
+    beq $t8, 0x32, set_hard # PRESSED 3
+    j difficulty_select_main
+set_easy:
+    li $s3, 1
+    j difficulty_select_done
+set_normal:
+    li $s3, 2
+    j difficulty_select_done
+set_hard:
+    li $s3, 3
+    j difficulty_select_done
+    
+    
+difficulty_select_done:
+    
+    
+    
+    # Draw Player Box
     jal draw_box
     
     # ## TESTING COLUMN ##
@@ -192,6 +224,7 @@ draw_box_line_loop:
 
 draw_box_col:
     lw $t0, ADDR_DSPL
+    li $t1, 0xFFFFFF
     addi $t0, $t0, 396
     addi $t2, $t0, 2560 # Draws until 20 rows have been created
 draw_box_col_loop: 
@@ -305,19 +338,43 @@ check_falling_down:
     
 
 ### 
+
+check_game_over:
+    la $t9, GAMEBOARD
+    addi $t8, $t9, 12
+    addi $t8, $t8, 84
+    # Check 3rd pixel of column that newly spawns
+    lw $t7, 0($t8)
+    bne $t7,0x000000, game_end_screen
+    jr $ra 
+    
 game_end_screen:
     
     ### CLEAR SCREEN 
     jal clear_screen_main
 
-    
-    
-    ### SHOW MESSAGE/ INFO!
-    ### RESET BUTTON
 
-### When P is pressed
-    j game_end_screen
+
+# RAFIE DID THIS!
+### SHOW MESSAGE/ INFO!
+
+game_end_loop:
+    lw $t9, ADDR_KBRD
+    lw $t8, 0($t9)
+    beq $t8, 0, game_end_loop
+    lw $t8 4($t9)
+    beq $t8, 0x72, start_again_anew
     
+    
+    ### RESET BUTTON
+    j game_end_loop
+start_again_anew:
+    jal clear_screen_main
+    # Go back to main in order to reset our game
+    j main
+    
+####
+
 clear_screen_main:
     lw $t9, ADDR_DSPL
     li $t8, 8192
@@ -328,12 +385,14 @@ clear_screen_main:
     beq $t6, $t8, clear_screen_loop_end
     sw $t5, 0($t9)
     addi $t9, $t9, 4
+    addi $t6, $t6, 4
     j clear_screen_loop
     
     
 clear_screen_loop_end:
     jr $ra
 
+### When P is pressed
 pause_state:
     # set args
     li $a0, 0xFFFFFF
@@ -382,12 +441,14 @@ draw_pause:
     
     
     jr $ra
+
     
 
 game_loop:
     # Draw Column Function ~~~!!!~~~
     beq $s6, 1, step                    # only make a new column when nothing is falling down (s6 stores this info)
     jal clear_stuff
+    jal check_game_over # Check if GAMEOVER CONDITION HAPPENS!
     lw $t0, ADDR_DSPL                   # make a new column
     addi $a2, $t0, 412
     jal draw_game_column
