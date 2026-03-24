@@ -36,13 +36,17 @@ GREEN: .word 0x009B77:1
 BLUE: .word 0x0F52BA:1
 PURPLE: .word 0x9966CC:1
 
-# Coords
-X_COORD: .word 0:1
-Y_COORD: .word 0:1
-
 ##############################################################################
 # Mutable Data
 ##############################################################################
+FALLING_DOWN: .word 1:1
+GRAVITY_COUNTER: .word 0:1
+# Coords
+X_COORD: .word 0:1
+Y_COORD: .word 0:1
+# Clearing Counter
+CLEAR_LOOP: .word 0:1
+GRAVITY_LOOP: .word 0:1
 
 ##############################################################################
 # Code
@@ -53,26 +57,25 @@ Y_COORD: .word 0:1
     # Run the game.
 main:
     # Initialize the game
+    li $s7, 0 # the game's clock. DO NOT USE ANYWHERE ELSE
     
     lw $t0, ADDR_DSPL # Load Bitmap Display
     li $t1, 0xFFFFFF # Load Color
     
-    # ### Testing Gravity ###
-    # li $t2, 0xff0000            # blue
-    # la $t9, GAMEBOARD           # t9 holds address of gameboard
-    # sw $t2, 52($t9)             # make the top right of the gameboard blue
-    # #######################
-    
-    
+    ### Testing Gravity ###
+    #li $t2, 0xff0000            # blue
+    #la $t9, GAMEBOARD           # t9 holds address of gameboard
+    #sw $t2, 52($t9)             # make the top right of the gameboard blue
+    #######################
     
     # Draw Player 1 Box
     jal draw_box
     
-    ## TESTING COLUMN ##
-    addi $a2, $t0, 412
-    jal draw_game_column
-    jal draw_particles
-    ####################
+    # ## TESTING COLUMN ##
+    # addi $a2, $t0, 412
+    # jal draw_game_column
+    # jal draw_particles
+    # ####################
     
     # Start game
     jal game_loop
@@ -238,7 +241,6 @@ apply_gravity:
     # Add 1 and Update
     addi $t4, $t4, 1
     sw $t4, 0($t6)
-    
     jr $ra
 
 draw_particles:
@@ -274,35 +276,224 @@ draw_particles:
     draw_particles_loop_end:
     jr $ra
 
-game_loop:
-    lw $t0, ADDR_DSPL
+check_falling_down:
+    li $s6, 0                   # assume initially things don't fall down
+    la $t9, GAMEBOARD
+    addi $t0, $zero, 146        # t0 holds i = 146
+    addi $t1, $zero, 6          # t1 holds 18
     
+    falling_loop:
+        ble $t0, $t1, falling_loop_end          # exit loop when i <= 6
+        sll $t2, $t0, 2                         # t2 = t0*4 = i*4 = offset
+        add $t3, $t9, $t2                       # t3 points to A[i]
+        lw $t6, 0($t3)                          # t6 holds color of A[i]
+        bne $t6, 0, upd01                       # check if color of A[i] is black, if it isn't, move on
+        subi $t0, $t0, 7                        # t0 holds i-7
+        sll $t2, $t0, 2                         # t2 update its offset
+        add $t4, $t9, $t2                       # t4 points to A[i-7], the row before
+        lw $t5, 0($t4)                          # t5 = A[i-7]
+        bne $t5, 0, falls_down
+        addi $t0, $t0, 7                        # t0 holds i
+        upd01:
+        subi $t0, $t0, 1                        # move to next element in array (t0 = i-1)
+        j falling_loop
+    
+    falls_down:
+    li $s6, 1           # things are falling down
+    falling_loop_end:
+    jr $ra
     
 
+### 
+game_end_screen:
+    ### CLEAR ALL DATA!
+    ### CLEAR SCREEN 
+    ### SHOW MESSAGE/ INFO!
+    ### RESET BUTTON
+
+### When P is pressed
+
+pause_state:
+    # set args
+    li $a0, 0xFFFFFF
+    jal draw_pause
+    lw $t9, ADDR_KBRD
+    lw $t8, 0($t9)
+    beq $t8, 0, pause_state
+    lw $t8 4($t9)
+    beq $t8, 0x70, stop_pause
+    j pause_state
+    
+
+stop_pause:
+    # set args
+    li $a0, 0x000000
+    jal draw_pause
+    j step_after
+    
+
+draw_pause:
+    # ARGS a0 
+    lw $t0, ADDR_DSPL
+    addi $t2, $t0, 3348
+    
+    # sw $a0, 0($t2)
+    sw $a0, 4($t2)
+    sw $a0, 12($t2)
+    # sw $a0, 16($t2)
+    
+    addi $t2, $t2, 128
+    
+    # sw $a0, 0($t2)
+    sw $a0, 4($t2)
+    sw $a0, 12($t2)
+    # sw $a0, 16($t2)
+    addi $t2, $t2, 128
+    # sw $a0, 0($t2)
+    sw $a0, 4($t2)
+    sw $a0, 12($t2)
+    # sw $a0, 16($t2)
+    addi $t2, $t2, 128
+    # sw $a0, 0($t2)
+    sw $a0, 4($t2)
+    sw $a0, 12($t2)
+    # sw $a0, 16($t2)
+    
+    
+    jr $ra
+    
+
+game_loop:
     # Draw Column Function ~~~!!!~~~
-    # addi $a2, $t0, 412
-    # jal draw_game_column
-    # jal draw_particles
+    beq $s6, 1, step                    # only make a new column when nothing is falling down (s6 stores this info)
+    jal clear_stuff
+    lw $t0, ADDR_DSPL                   # make a new column
+    addi $a2, $t0, 412
+    jal draw_game_column
     
-    # jal apply_gravity
-    
+    step:
     jal detect_movement 
-    
-    jal draw_particles
+    step_after:
     # 1a. Check if key has been pressed
     # 1b. Check which key has been pressed
     # 2a. Check for collisions
 	# 2b. Update locations (capsules)
+	### ONLY UPDATE GRAVITY EVERY 5 FRAMES
+	la $t0, GRAVITY_COUNTER
+	lw $t1, 0($t0)
+	addi $t1, $t1, 1
+	sw $t1, 0($t0)
+	bne $t1, 5, skip_gravity
+	sw $zero, 0($t0)
+	jal apply_gravity
+	skip_gravity:
 	# 3. Draw the screen
+	jal draw_particles
 	# 4. Sleep
+	li $v0, 32
+	li $a0, 40
+	syscall
     # 5. Go back to Step 1
+    jal check_falling_down
     j game_loop
+
+clear_stuff:
+    clear_loop:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    li $a0, 4
+    jal clear_rows
+    li $a0, -24
+    jal clear_rows
+    li $a0, 28
+    jal clear_rows
+    li $a0, 32
+    jal clear_rows
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    gravity_loop:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    jal apply_gravity
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    la $t0, GRAVITY_LOOP
+    lw $t1, 0($t0)
+    addi $t1, $t1, 1
+    sw $t1, 0($t0)
+    bge $t1, 20, next_loop
+    j gravity_loop
+    next_loop:
+    sw $zero, 0($t0)
+    la $t0, CLEAR_LOOP
+    lw $t1, 0($t0)
+    addi $t1, $t1, 1
+    sw $t1, 0($t0)
+    bge $t1, 20, end_clear
+    j clear_loop
+end_clear:
+    la $t0, CLEAR_LOOP
+    sw $zero, 0($t0)
+    la $t0, GRAVITY_LOOP
+    sw $zero, 0($t0)
+    jr $ra
+
+clear_rows:
+    la $t9, GAMEBOARD
+    add $t0, $zero, $zero           # row counter
+    add $t1, $zero, $zero           # column counter
+    clear_pixel_loop:
+    mult $t2, $t0, 7
+    add $t2, $t2, $t1
+    bge $t2, 147, exit_row_recursion
+    sll $t2, $t2, 2     
+    add $t2, $t9, $t2   # t2 stores current array element's memory address
+    li $s0, 1           # counter
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    addi $t6, $t1, 0    # variable to keep track whether we have exited bounds or not
+    jal recursive_rows
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    addi $t1, $t1, 1
+    ble $t1, 6, clear_pixel_loop
+    li $t1, 0
+    addi $t0, $t0, 1
+    j clear_pixel_loop
+recursive_rows:
+    add $t3, $t2, $a0    # next array element
+    lw $t4, 0($t2)      # current color
+    lw $t5, 0($t3)      # next color
+    # TODO: FIX THIS WRAPPING PROBLEM
+    sub $t7, $t3, $t9
+    srl $t7, $t7, 2
+    bge $t7, 147, exit_row_recursion    # next element is out of array bounds
+    beq $t6, 6, exit_row_recursion      # next element is out of column bounds
+    bne $t4, $t5, exit_row_recursion    # next element does not have the same color
+    addi $sp, $sp, -4
+    sw $t2, 0($sp)      # store current array element in stack
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)      # store ra in stack
+    add $t2, $t2, $a0    # set current array element to next element
+    addi $s0, $s0, 1    # increment counter
+    addi $t6, $t6, 1
+    jal recursive_rows
+    lw $ra, 0($sp)      # pop ra from stack
+    addi $sp, $sp, 4
+    lw $t2, 0($sp)      # get stored current array element
+    addi $sp, $sp, 4
+exit_row_recursion:
+    bge $s0, 3, clear_color
+    jr $ra
+    clear_color:
+    sw $zero, 0($t2)
+    jr $ra
     
+
 detect_movement: 
     ### INIT KEYBOARD
     la $t1, GAMEBOARD
     lw $t9, ADDR_KBRD
-    
     
     la $t7, X_COORD
     la $t6, Y_COORD
@@ -310,7 +501,6 @@ detect_movement:
     lw $t5, 0( $t7 ) # Load value of X
     lw $t4, 0( $t6 ) # Load value of Y
    
-    
     # Format Coordinates
     # Format Y
     addi $t4, $t4, 1
@@ -327,7 +517,7 @@ detect_movement:
     # Keep track of x coord
     lw $t4, 0( $t7 )
     
-     ### CHECK INPUT 
+    ### CHECK INPUT 
     lw $t8, 0($t9)
     beq $t8, 0, exit_detection
     lw $t8 4($t9)
@@ -336,23 +526,34 @@ detect_movement:
     beq $t8, 0x77, respond_to_w
     beq $t8, 0x73, respond_to_s
     
+
+    # Pause
+    beq $t8, 0x70, respond_to_p
+    # Quit
+    beq $t8, 0x71, game_end_screen
+    
+    respond_to_p:
+    # Go to pause loop
+    j pause_state
+    
 exit_detection:  
     jr $ra 
 respond_to_a:
     beq $t4, 0, exit_detection
+    lw $t2 52($t5)                      # only need to check this pixel for left collision detection
+    bne $t2, 0, exit_detection          # check if there is something to the left
     subi $t5, $t5, 4 # (MOVE LEFT)
     subi $t4, $t4, 1 # (Move Left)
     sw $t4, 0($t7) # Update X 
-    
-    
     j draw_new_col_position
     
 respond_to_d:
     beq $t4, 6, exit_detection
+    lw $t2 60($t5)                      # only need to check this pixel for right collision detection
+    bne $t2, 0, exit_detection          # check if there is something to the right
     addi $t5, $t5, 4 # MOVE RIGHT
     addi $t4, $t4, 1 # (Move Right)
     sw $t4, 0($t7) # Update X 
-    
     j draw_new_col_position
     
 respond_to_w:
@@ -367,8 +568,6 @@ respond_to_w:
     jr $ra 
     
 respond_to_s: 
-    
-    
     ### STORE CURRENT $ra INTO STACK
     addi $sp, $sp, -4
     sw $ra, 0($sp)
@@ -383,7 +582,6 @@ respond_to_s:
     
     ### RETURN 
     jr $ra
-    
     
 draw_new_col_position:
     ### DRAW CURRENT PIXELS INTO NEW LOCATION
@@ -412,3 +610,21 @@ draw_new_col_position:
     sw $t9 0($t3) # Erase Color
     
     jr $ra
+    
+check_rows:
+    la $t9 GAMEBOARD
+    lw $t0, 0                   # row index
+    lw $t1, 0                   # column index
+    check_rows_loop:
+        beq $t0, 21, check_rows_end
+        beq $t1, 5, next_row
+            
+        j check_rows_loop
+        next_row:
+        lw $t1, 0
+        addi $t0, $t0, 1
+        j check_rows_loop
+    check_rows_end:
+    jr $ra
+check_cols:
+check_diags:
