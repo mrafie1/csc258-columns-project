@@ -306,12 +306,33 @@ check_falling_down:
 
 ### 
 game_end_screen:
-    ### CLEAR ALL DATA!
+    
     ### CLEAR SCREEN 
+    jal clear_screen_main
+
+    
+    
     ### SHOW MESSAGE/ INFO!
     ### RESET BUTTON
 
 ### When P is pressed
+    j game_end_screen
+    
+clear_screen_main:
+    lw $t9, ADDR_DSPL
+    li $t8, 8192
+    li $t6, 0
+    li $t5, 0x000000
+    
+    clear_screen_loop:
+    beq $t6, $t8, clear_screen_loop_end
+    sw $t5, 0($t9)
+    addi $t9, $t9, 4
+    j clear_screen_loop
+    
+    
+clear_screen_loop_end:
+    jr $ra
 
 pause_state:
     # set args
