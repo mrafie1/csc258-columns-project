@@ -54,6 +54,15 @@ GRAVITY_LOOP: .word 0:1
 	.text
 	.globl main
 
+.macro push (%reg)
+subi $sp, $sp, 4
+sw %reg, 0($sp)
+.end_macro
+
+.macro pop (%reg)
+lw %reg, 0($sp)
+addi $sp, $sp, 4
+.end_macro
     # Run the game.
 main:
     # Initialize the game
@@ -69,6 +78,9 @@ main:
     #sw $t2, 52($t9)             # make the top right of the gameboard blue
     #######################
 
+    ### Testing Future Columns ###
+    
+    ##############################
     
     ### CHOOSE DIFFICULTY
     li $s3, 0 # DIFFICULTY SETTING
@@ -108,8 +120,63 @@ difficulty_select_done:
     # jal draw_particles
     # ####################
     
+    # initialize columns
+    jal generate_cloumns
+    jal generate_cloumns
+    jal generate_cloumns
+    jal generate_cloumns
+    
     # Start game
     jal game_loop
+
+.macro random_color (%reg)
+li $v0, 42 
+li $a0, 0
+li $a1, 6
+syscall
+addi $a3, $a0, 0
+push ($ra)
+jal check_set_color
+pop ($ra)
+lw %reg, 0($v0)
+.end_macro
+
+generate_cloumns:
+    lw $t9, ADDR_DSPL
+    
+    # first column from the right copies from the second
+    lw $t0, 572($t9)
+    sw $t0, 564($t9)
+    lw $t0, 700($t9)
+    sw $t0, 692($t9)
+    lw $t0, 828($t9)
+    sw $t0, 820($t9)
+    
+    # second column from the right copies from the third
+    lw $t0, 580($t9)
+    sw $t0, 572($t9)
+    lw $t0, 708($t9)
+    sw $t0, 700($t9)
+    lw $t0, 836($t9)
+    sw $t0, 828($t9)
+    
+    # third column from the right copies from the rightmost
+    lw $t0, 588($t9)
+    sw $t0, 580($t9)
+    lw $t0, 716($t9)
+    sw $t0, 708($t9)
+    lw $t0, 844($t9)
+    sw $t0, 836($t9)
+    
+    # rightmost column is randomly generated
+    random_color ($t0)
+    sw $t0, 588($t9)
+    random_color ($t0)
+    sw $t0, 716($t9)
+    random_color ($t0)
+    sw $t0, 844($t9)
+    
+    jr $ra
 
 draw_game_column:
     # INIT X AND Y VALUE OF TOP PIXEL
@@ -122,70 +189,35 @@ draw_game_column:
     sw $t7, 0($t9)
     sw $t6, 0($t8)
     
-    
     la $t9, GAMEBOARD
     # Push Previous Call Address onto stack
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
+    push ($ra)
     
     # ARGS: $a2 (Coordinate where column is drawn)
-    li $v0, 42 
-    li $a0, 0
-    li $a1, 6
-    syscall
-    add $t1, $zero, $a0
-    
-    li $v0, 42 
-    li $a0, 0
-    li $a1, 6
-    syscall
-    add $t2, $zero, $a0
-    
-    li $v0, 42 
-    li $a0, 0
-    li $a1, 6
-    syscall
-    add $t3, $zero, $a0
-    
-    add $a3, $zero, $t1
-    jal check_set_color
-    lw $t4, 0($v0)
+    lw $t5, ADDR_DSPL
+    lw $t4, 564($t5)
     sw $t4, 40($t9)
     
-    add $a3, $zero, $t2
-    jal check_set_color
-    lw $t4, 0($v0)
+    lw $t4, 692($t5)
     sw $t4, 68($t9)
     
-    add $a3, $zero, $t3
-    jal check_set_color
-    lw $t4, 0($v0)
+    lw $t4, 820($t5)
     sw $t4, 96($t9)
     
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    pop ($ra)
     jr $ra
     
 check_set_color:
     # ARGS: $a3 NUM TO COLOR
     # FOR CREATING COLORS OF THE CREATION OF COLUMNS
-    # Push Previous Call Address onto stack
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
     
     # Check if number equal to color
-    li $t4, 0
-    beq $a3, $t4, setRED
-    li $t4, 1
-    beq $a3, $t4, setORANGE
-    li $t4, 2
-    beq $a3, $t4, setYELLOW
-    li $t4, 3
-    beq $a3, $t4, setGREEN
-    li $t4, 4
-    beq $a3, $t4, setBLUE
-    li $t4, 5
-    beq $a3, $t4, setPURPLE
+    beq $a3, 0, setRED
+    beq $a3, 1, setORANGE
+    beq $a3, 2, setYELLOW
+    beq $a3, 3, setGREEN
+    beq $a3, 4, setBLUE
+    beq $a3, 5, setPURPLE
     
 setRED:
     la $v0, RED 
@@ -206,12 +238,11 @@ setPURPLE:
     la $v0, PURPLE
     j endSetColor
 endSetColor:
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
     jr $ra
 
 draw_box:
     # Drawing the first line (9 Long)
+    lw $t0, ADDR_DSPL
     addi $t0, $t0, 268
     addi $t2, $t0, 36
 draw_box_line_loop: 
@@ -504,6 +535,7 @@ game_loop:
     lw $t0, ADDR_DSPL                   # make a new column
     addi $a2, $t0, 412
     jal draw_game_column
+    jal generate_cloumns
     
     ble $s2, 10, step
     bge $s2, 100, step
