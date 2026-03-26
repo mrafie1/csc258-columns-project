@@ -48,6 +48,110 @@ Y_COORD: .word 0:1
 CLEAR_LOOP: .word 0:1
 GRAVITY_LOOP: .word 0:1
 
+##### 
+# MACROS
+.macro draw_one(%reg)
+    sw $t9, 0(%reg)
+    addi %reg, %reg, 128
+    sw $t9, 0(%reg)
+    addi %reg, %reg, 128
+    sw $t9, 0(%reg)
+    addi %reg, %reg, 128
+    sw $t9, 0(%reg)
+    addi %reg, %reg, 128
+    sw $t9, 0(%reg)
+.end_macro
+
+.macro draw_two(%reg)
+    sw $t9, 0(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 512(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 512(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 128(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 512(%reg)
+.end_macro
+
+.macro draw_three(%reg)
+    sw $t9, 0(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 512(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 512(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 128(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 512(%reg)
+.end_macro
+
+.macro draw_G(%reg)
+    sw $t9, 128(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 512(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 640(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 640(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 640(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 384(%reg)
+    sw $t9, 512(%reg)
+.end_macro
+
+.macro draw_R(%reg)
+    sw $t9, 128(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 512(%reg)
+    sw $t9, 640(%reg)
+    sw $t9, 768(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 384(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 512(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 0(%reg)
+    sw $t9, 384(%reg)
+    sw $t9, 640(%reg)
+    
+    addi %reg, %reg, 4
+    sw $t9, 128(%reg)
+    sw $t9, 256(%reg)
+    sw $t9, 768(%reg)
+.end_macro
+#####
+
 ##############################################################################
 # Code
 ##############################################################################
@@ -56,8 +160,11 @@ GRAVITY_LOOP: .word 0:1
 
     # Run the game.
 main:
+    jal draw_difficulty_screen
+    
     # Initialize the game
     li $s7, 0 # the game's clock. DO NOT USE ANYWHERE ELSE
+    li $s2, 0 # total pixels cleared
     
     lw $t0, ADDR_DSPL # Load Bitmap Display
     li $t1, 0xFFFFFF # Load Color
@@ -68,7 +175,6 @@ main:
     #sw $t2, 52($t9)             # make the top right of the gameboard blue
     #######################
 
-    
     
     ### CHOOSE DIFFICULTY
     li $s3, 0 # DIFFICULTY SETTING
@@ -85,24 +191,24 @@ difficulty_select_main:
     beq $t8, 0x31, set_easy # PRESSED 1
     
     beq $t8, 0x32, set_normal # PRESSED 2
-    beq $t8, 0x32, set_hard # PRESSED 3
+    beq $t8, 0x33, set_hard # PRESSED 3
     j difficulty_select_main
 set_easy:
-    li $s3, 1
+    li $s3, 6
     j difficulty_select_done
 set_normal:
-    li $s3, 2
+    li $s3, 4
     j difficulty_select_done
 set_hard:
-    li $s3, 3
+    li $s3, 2
     j difficulty_select_done
+    
+    
     
     
 difficulty_select_done:
-    
-    
-    
     # Draw Player Box
+    jal clear_screen_main
     jal draw_box
     
     # ## TESTING COLUMN ##
@@ -359,6 +465,8 @@ game_end_screen:
 
 # RAFIE DID THIS!
 ### SHOW MESSAGE/ INFO!
+    jal draw_game_over_screen
+    jal pvz_game_over
 
 game_end_loop:
     lw $t9, ADDR_KBRD
@@ -453,6 +561,7 @@ clear_screen_loop_end:
 
 ### When P is pressed
 pause_state:
+    
     # set args
     li $a0, 0xFFFFFF
     jal draw_pause
@@ -468,6 +577,7 @@ stop_pause:
     # set args
     li $a0, 0x000000
     jal draw_pause
+    jal pvz_pause
     j step_after
     
 
@@ -497,11 +607,7 @@ draw_pause:
     sw $a0, 4($t2)
     sw $a0, 12($t2)
     # sw $a0, 16($t2)
-    
-    
     jr $ra
-
-    
 
 game_loop:
     # Draw Column Function ~~~!!!~~~
@@ -511,6 +617,11 @@ game_loop:
     lw $t0, ADDR_DSPL                   # make a new column
     addi $a2, $t0, 412
     jal draw_game_column
+    
+    ble $s2, 10, step
+    bge $s2, 100, step
+    subi $s3, $s3, 1
+    addi $s2, $s2, 100
     
     step:
     jal detect_movement 
@@ -524,7 +635,7 @@ game_loop:
 	lw $t1, 0($t0)
 	addi $t1, $t1, 1
 	sw $t1, 0($t0)
-	bne $t1, 5, skip_gravity
+	bne $t1, $s3, skip_gravity
 	sw $zero, 0($t0)
 	jal apply_gravity
 	skip_gravity:
@@ -540,8 +651,14 @@ game_loop:
 
 clear_stuff:
     clear_loop:
+    beq $s1, 0, start_clearing
+    li $v0, 32
+	li $a0, 400
+	syscall
+    start_clearing:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
+    li $s1, 0           # assume nothing was cleared
     li $a0, 4
     jal clear_rows
     li $a0, -24
@@ -550,8 +667,13 @@ clear_stuff:
     jal clear_rows
     li $a0, 32
     jal clear_rows
+    jal draw_particles
     lw $ra, 0($sp)
     addi $sp, $sp, 4
+    beq $s1, 0, gravity_loop
+    li $v0, 32
+	li $a0, 400
+	syscall
     gravity_loop:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
@@ -571,6 +693,11 @@ clear_stuff:
     addi $t1, $t1, 1
     sw $t1, 0($t0)
     bge $t1, 20, end_clear
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    jal draw_particles
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
     j clear_loop
 end_clear:
     la $t0, CLEAR_LOOP
@@ -608,9 +735,12 @@ recursive_rows:
     # TODO: FIX THIS WRAPPING PROBLEM
     sub $t7, $t3, $t9
     srl $t7, $t7, 2
+    beq $t4, 0, exit_row_recursion      # current element is black
     bge $t7, 147, exit_row_recursion    # next element is out of array bounds
-    beq $t6, 6, exit_row_recursion      # next element is out of column bounds
     bne $t4, $t5, exit_row_recursion    # next element does not have the same color
+    beq $a0, 28, skip_column_check
+    beq $t6, 6, exit_row_recursion      # next element is out of column bounds
+    skip_column_check:
     addi $sp, $sp, -4
     sw $t2, 0($sp)      # store current array element in stack
     addi $sp, $sp, -4
@@ -627,6 +757,8 @@ exit_row_recursion:
     bge $s0, 3, clear_color
     jr $ra
     clear_color:
+    addi $s1, $s1, 1    # add amount of cleared pixels
+    addi $s2, $s2, 1    # add total amount of cleared pixels
     sw $zero, 0($t2)
     jr $ra
     
@@ -675,6 +807,7 @@ detect_movement:
     
     respond_to_p:
     # Go to pause loop
+    jal pvz_pause
     j pause_state
     
 exit_detection:  
@@ -712,15 +845,11 @@ respond_to_s:
     ### STORE CURRENT $ra INTO STACK
     addi $sp, $sp, -4
     sw $ra, 0($sp)
-    
     ### CALL GRAVITY FUNCTION
     jal apply_gravity
-    
     ### POP CURRENT $ra OUT OF STACK
     lw $ra, 0($sp)
     addi $sp, $sp, 4
-    
-    
     ### RETURN 
     jr $ra
     
@@ -752,20 +881,166 @@ draw_new_col_position:
     
     jr $ra
     
-check_rows:
-    la $t9 GAMEBOARD
-    lw $t0, 0                   # row index
-    lw $t1, 0                   # column index
-    check_rows_loop:
-        beq $t0, 21, check_rows_end
-        beq $t1, 5, next_row
-            
-        j check_rows_loop
-        next_row:
-        lw $t1, 0
-        addi $t0, $t0, 1
-        j check_rows_loop
-    check_rows_end:
+    
+draw_difficulty_screen:
+    lw $t0, ADDR_DSPL
+    li $t9, 0x7EE04A
+    addi $t1, $t0, 1792
+    addi $t1, $t1, 28
+    addi $t2, $t1, 28
+    addi $t3, $t1, 64
+    
+    draw_one($t1)
+    li $t9, 0xCDE04A
+    draw_two($t2)
+    li $t9, 0xE04A4A
+    draw_three($t3)
+    
+    jr $ra 
+
+draw_game_over_screen: 
+    lw $t0, ADDR_DSPL
+    li $t9, 0xFFFFFFF
+    addi $t1, $t0, 684
+    draw_G($t1)
+    addi $t1, $t1, 12
+    draw_G($t1)
+    
+    # Exclamation Mark Here
+    addi $t1, $t1, 12
+    sw $t9, 0($t1)
+    sw $t9, 128($t1)
+    sw $t9, 256($t1)
+    sw $t9, 384($t1)
+    sw $t9, 640($t1)
+    
+    add $t1, $t0, 2348
+    draw_R($t1)
+    
+    # Question Mark
+    add $t1, $t1, 12
+    sw $t9, 0($t1)
+    
+    add $t1, $t1, 4
+    sw $t9, 0($t1)
+    sw $t9, 512($t1)
+    sw $t9, 768($t1)
+    
+    add $t1, $t1, 4
+    sw $t9, 0($t1)
+    sw $t9, 384($t1)
+    
+    add $t1, $t1, 4
+    sw $t9, 128($t1)
+    sw $t9, 256($t1)
     jr $ra
-check_cols:
-check_diags:
+    
+   
+pvz_game_over:
+li $v0, 32
+li $a0 300
+syscall 
+
+li $a0, 65
+li $a1, 400
+li $a2, 14
+li $a3, 120
+
+li $v0,31
+syscall 
+li $v0, 32
+li $a0, 750
+syscall
+li $v0,31
+li $a0 64
+syscall 
+li $v0, 32
+li $a0, 750
+syscall
+li $v0,31
+li $a0 63
+syscall 
+li $v0, 32
+li $a0, 750
+syscall
+li $v0,31
+li $a0 62
+li $a1 700
+syscall 
+jr $ra
+
+pvz_pause:
+li $v0, 31
+li $a0, 64  
+li $a1, 120 
+li $a2, 10
+li $a3, 110
+syscall
+
+li $v0, 32
+li $a0, 80
+syscall
+
+li $v0, 31
+li $a0, 69
+li $a1, 150
+li $a2, 10
+li $a3, 110
+syscall
+jr $ra
+
+pvz_spawn_col:
+li $v0, 31
+li $a0, 60
+li $a1, 100
+li $a2, 10
+li $a3, 100
+syscall
+li $v0, 32
+li $a0, 60
+syscall
+
+li $v0, 31
+li $a0, 64 
+syscall
+li $v0, 32
+li $a0, 60
+syscall
+li $v0, 31
+li $a0, 67
+li $a1, 120
+li $a3, 110
+syscall
+jr $ra
+
+zuma_break_col:
+li $v0, 31
+li $a0, 58    
+li $a1, 60
+li $a2, 11     
+li $a3, 110
+syscall
+
+li $v0, 32
+li $a0, 30
+syscall
+
+li $t0, 70     
+li $t1, 3      
+
+sparkle_loop:
+    li $v0, 31
+    move $a0, $t0
+    li $a1, 50
+    li $a2, 11
+    li $a3, 120
+    syscall
+
+    li $v0, 32
+    li $a0, 25
+    syscall
+
+    addi $t0, $t0, 2 
+    addi $t1, $t1, -1
+    bgtz $t1, sparkle_loop
+jr $ra 
