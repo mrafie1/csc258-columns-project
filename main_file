@@ -67,6 +67,8 @@ main:
     #la $t9, GAMEBOARD           # t9 holds address of gameboard
     #sw $t2, 52($t9)             # make the top right of the gameboard blue
     #######################
+
+    
     
     ### CHOOSE DIFFICULTY
     li $s3, 0 # DIFFICULTY SETTING
@@ -150,7 +152,6 @@ draw_game_column:
     
     add $a3, $zero, $t1
     jal check_set_color
-    
     lw $t4, 0($v0)
     sw $t4, 40($t9)
     
@@ -188,6 +189,7 @@ check_set_color:
     beq $a3, $t4, setBLUE
     li $t4, 5
     beq $a3, $t4, setPURPLE
+    
 setRED:
     la $v0, RED 
     j endSetColor
@@ -365,15 +367,72 @@ game_end_loop:
     lw $t8 4($t9)
     beq $t8, 0x72, start_again_anew
     
-    
-    ### RESET BUTTON
+
     j game_end_loop
 start_again_anew:
     jal clear_screen_main
+    # Reset Info
+    la $t9, GAMEBOARD
+    li $t4, 0x000000
+    addi $t8, $t9, 592
+    
+    reset_array_loop:
+    beq $t9, $t8, stop_reset
+    
+    
+    sw $t4, 0($t9)
+    addi $t9, $t9, 4
+    
+    j reset_array_loop
+    
+    
+    
+    ### ### ### ###
+    
+    
+    stop_reset:
     # Go back to main in order to reset our game
+    li $t2, 0
+    li $t3, 1
+    la $t4, FALLING_DOWN
+    sw $t3, 0($t4)
+    la $t4, GRAVITY_COUNTER
+    sw $t2, 0($t4)
+    la $t4, X_COORD
+    sw $t2, 0($t4)
+    la $t4, Y_COORD
+    sw $t2, 0($t4)
+    la $t4, CLEAR_LOOP
+    sw $t2, 0($t4)
+    la $t4, GRAVITY_LOOP
+    sw $t2, 0($t4)
+    li $s6, 0
+    li $s2, 0
+    li $s0, 0
+    li $s7, 0
+
+    la $t4, RED
+    li $t3, 0x9B111E
+    sw $t3, 0($t4)
+    la $t4, ORANGE
+    li $t3, 0xFF8C42
+    sw $t3, 0($t4)
+    la $t4, YELLOW
+    li $t3, 0xFFC857
+    sw $t3, 0($t4)
+    la $t4, GREEN
+    li $t3, 0x009B77
+    sw $t3, 0($t4)
+    la $t4, BLUE
+    li $t3, 0x0F52BA
+    sw $t3, 0($t4)
+    la $t4, PURPLE
+    li $t3, 0x9966CC
+    sw $t3, 0($t4)
+    
     j main
     
-####
+#### RAFIE END
 
 clear_screen_main:
     lw $t9, ADDR_DSPL
