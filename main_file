@@ -1,17 +1,17 @@
 ################# CSC258 Assembly Final Project ###################
 # This file contains our implementation of Columns.
 #
-# Student 1: Name, Student Number
-# Student 2: Name, Student Number (if applicable)
+# Student 1: Muhammad Rafie 1011635884
+# Student 2: Muhammad Zendy Zainuddin 1011270170
 #
 # We assert that the code submitted here is entirely our own 
 # creation, and will indicate otherwise when it is not.
 #
 ######################## Bitmap Display Configuration ########################
-# - Unit width in pixels:       TODO
-# - Unit height in pixels:      TODO
-# - Display width in pixels:    TODO
-# - Display height in pixels:   TODO
+# - Unit width in pixels:       8
+# - Unit height in pixels:      8
+# - Display width in pixels:    256
+# - Display height in pixels:   256
 # - Base Address for Display:   0x10008000 ($gp)
 ##############################################################################
 
@@ -28,7 +28,7 @@ HEIGHT: .word 20:1
 WIDTH: .word 7:1
 # Array representing the gameboard
 GAMEBOARD: .word 0:147 # WIDTH * (HEIGHT + 1)
-# COLORS
+# STORED COLORS
 RED: .word 0x9B111E:1
 ORANGE: .word 0xFF8C42:1
 YELLOW: .word 0xFFC857:1
@@ -1070,4 +1070,4 @@ sparkle_loop:
     addi $s5, $s5, 2 
     addi $s4, $s4, -1
     bgtz $s4, sparkle_loop
-jr $ra
+jr $ra  
